@@ -42,6 +42,10 @@ argv.options('v', {
 argv.options('version', {
 	describe: 'Print package version.',
 })
+argv.options('k', {
+	alias: 'key',
+	describe: 'Path to a cps.dll for decrypting encrypted GRF files.',
+})
 argv.options('h', {
 	alias: 'help',
 	describe: 'Print help and usage information',
@@ -59,7 +63,7 @@ if(arg.version) {
 
 // Print help
 if(!arg.g || arg.h) {
-	console.error("Usage: grf-extractor -g data.grf -o output_dir")
+	console.error("Usage: grf-extractor -g data.grf -o output_dir [-k cps.dll]")
 	argv.showHelp()
 	return
 }
@@ -135,10 +139,27 @@ if(typeof arg.e === 'string') {
 	return
 }
 
+// Load CPS decryption key if provided
+var Cluster = require('cluster')
+var cpsSbox = null
+if(typeof arg.k === 'string') {
+	var Cps = require('./lib/cps.js')
+	try {
+		cpsSbox = Cps.loadKey(arg.k)
+		if(Cluster.isMaster) {
+			console.log("Loaded CPS decryption key from %s", arg.k)
+		}
+	} catch(err) {
+		console.error("Failed to load CPS key:", err.message)
+		return
+	}
+}
+
 // Default action, extract the entire grf
 var extraction = grf.extract({
 	output: (typeof arg.o !== 'string' ? '' : arg.o),
 	concurrency: arg.c,
+	cpsSbox: cpsSbox,
 })
 
 extraction.on('start', function() {
